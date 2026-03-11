@@ -47,3 +47,27 @@ class EssayDataset(Dataset):
             'attention_mask': encoding['attention_mask'].flatten(),
             'score': torch.tensor(score, dtype=torch.float)
         }
+        
+train_texts, val_texts, train_scores, val_scores = train_test_split(
+    df['Essay'], df['Overall'], test_size=0.2, random_state=42
+)
+
+train_dataset = EssayDataset(train_texts.toList(), train_scores.tolist(), tokenizer)
+val_dataset = EssayDataset(val_texts.tolist(), val_scores.tolist(), tokenizer)
+
+train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=8)
+
+class EssayGradingModel(torch.nn.Module):
+    def __init__(self):
+        super(EssayGradingModel, self).__init__()
+        self.bert = BertModel.from_pretrained('bert-base-uncased')
+        self.regressor = torch.nn.Linear(self.bert.config.hidden_size, 1)
+        
+    def forward(self, input_ids, attention_mask):
+        outputs = self.bert(input_ids, attention_mask=attention_mask)
+        cls_output = outputs.pooler_output
+        score = self.regressor(cls_output)
+        return score.squeeze()
+    
+# initialize model, optimizer, lass function
