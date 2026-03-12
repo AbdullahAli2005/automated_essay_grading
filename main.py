@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error,r2_score
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
@@ -71,3 +71,48 @@ class EssayGradingModel(torch.nn.Module):
         return score.squeeze()
     
 # initialize model, optimizer, lass function
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = EssayGradingModel().to(device)
+optimizer = AdamW(model.parametters(), lr=2e-5)
+loss_fn = torch.nn.MSELoss()
+
+def train(model, data_loader, loss_fn, optimizer, device):
+    model.train()
+    total_loss = 0
+    for batch in data_loader:
+        optimizer.zero_grad
+        input_ids = batch['input_ids'].to(device)
+        attention_mask = batch['attention_mask'].to(device)
+        scores = batch['score'].to(device)
+        
+        outputs = model(input_ids=input_ids,        attention_mask=attention_mask)
+        loss = loss_fn(outputs, scores)
+        loss.backward()
+        optimizer.step()
+        
+        total_loss += loss.item()
+        
+    return total_loss / len(data_loader)
+
+def evaluate(model, data_loader, loss_fn, device):
+    model.eval()
+    predictions = []
+    true_scores = []
+    total_loss = 0
+    
+    with torch.no_grad():
+        for batch in data_loader:
+            input_ids = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            scores = batch['scores'].to(device)
+            
+            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
+            loss = loss_fn(outputs, scores)
+            total_loss += loss.item()
+            
+            predictions.extend(outputs.cpu().numpy())
+            true_scores.extend(scores.cpu().numpy())
+            
+    mse = mean_squared_error(true_scores, predictions)
+    r2 = r2_score(true_scores, predictions)
+    return total_loss / len(data_loader), mse, r2
