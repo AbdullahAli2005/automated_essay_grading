@@ -20,7 +20,7 @@ df = df[['Essay', 'Overall']]
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
 class EssayDataset(Dataset):
-    def __init__(self, essays, scores, tokenizer, max_len=512):
+    def __init__(self, essays, scores, tokenizer, max_len=256):
         self.essays = essays
         self.scores = scores
         self.tokenizer = tokenizer
@@ -33,7 +33,7 @@ class EssayDataset(Dataset):
         essay = str(self.essays[index])
         score = self.scores[index]
         
-        encoding = self.tokenizer.encode_plus(
+        encoding = self.tokenizer(
             essay,
             add_special_tokens=True,
             max_length=self.max_len,
@@ -56,8 +56,8 @@ train_texts, val_texts, train_scores, val_scores = train_test_split(
 train_dataset = EssayDataset(train_texts.tolist(), train_scores.tolist(), tokenizer)
 val_dataset = EssayDataset(val_texts.tolist(), val_scores.tolist(), tokenizer)
 
-train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=8)
+train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=4)
 
 class EssayGradingModel(torch.nn.Module):
     def __init__(self):
@@ -74,14 +74,14 @@ class EssayGradingModel(torch.nn.Module):
 # initialize model, optimizer, lass function
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = EssayGradingModel().to(device)
-optimizer = AdamW(model.parametters(), lr=2e-5)
+optimizer = AdamW(model.parameters(), lr=2e-5)
 loss_fn = torch.nn.MSELoss()
 
 def train(model, data_loader, loss_fn, optimizer, device):
     model.train()
     total_loss = 0
     for batch in data_loader:
-        optimizer.zero_grad
+        optimizer.zero_grad()
         input_ids = batch['input_ids'].to(device)
         attention_mask = batch['attention_mask'].to(device)
         scores = batch['score'].to(device)
@@ -105,7 +105,7 @@ def evaluate(model, data_loader, loss_fn, device):
         for batch in data_loader:
             input_ids = batch['input_ids'].to(device)
             attention_mask = batch['attention_mask'].to(device)
-            scores = batch['scores'].to(device)
+            scores = batch['score'].to(device)
             
             outputs = model(input_ids=input_ids, attention_mask=attention_mask)
             loss = loss_fn(outputs, scores)
@@ -126,7 +126,7 @@ for epoch in range(epochs):
     print(f'Epoch {epoch+1}, Train Loss: {train_loss:.4f}, Val loss: {val_loss:.4f}, MSE: {mse:.4f}, R2: {r2:.4f}')
 
 test_text = "The essay provided insightful analysis of the topic with well-structured arguments."
-encoding = tokenizer.encode_plus(test_text, add_special_tokens=True, max_length=512, padding='max_length',return_tensors='pt')
+encoding = tokenizer(test_text, add_special_tokens=True, max_length=256, padding='max_length',return_tensors='pt')
 input_ids = encoding['input_ids'].to(device)
 attention_mask = encoding['attention_mask'].to(device)
 
